@@ -80,6 +80,21 @@ export BEDROCK_MODEL_ID=meta.llama3-3-70b-instruct-v1:0
 export AWS_BEARER_TOKEN_BEDROCK="bedrock-api-key-..."
 ```
 
+```
+  If you want the full 10‑minute ctf_easy run, run this in your terminal and let it complete:
+
+  source .venv/bin/activate && \
+  BEDROCK_REGION=us-east-2 \
+  BEDROCK_MODEL_ID=meta.llama3-3-70b-instruct-v1:0 \
+  python -m supervisor.supervisor \
+    --config-file configs/tests/ctf_easy.yaml \
+    --benchmark-mode \
+    --duration 10 \
+    --skip-todos
+
+``` 
+
+
 ### Quick Test Run
 
 Try a simple CTF challenge to verify everything works:
