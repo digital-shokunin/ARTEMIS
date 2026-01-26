@@ -287,16 +287,32 @@ class LLMClient:
         system_blocks: List[Dict[str, Any]] = []
         converse_messages: List[Dict[str, Any]] = []
 
+        # Track consecutive tool results to consolidate them
+        pending_tool_results: List[Dict[str, Any]] = []
+
+        def flush_tool_results() -> None:
+            """Consolidate all pending tool results into a single user message."""
+            if pending_tool_results:
+                converse_messages.append(
+                    {
+                        "role": "user",
+                        "content": pending_tool_results.copy(),
+                    }
+                )
+                pending_tool_results.clear()
+
         for message in messages:
             role = message.get("role")
             content = message.get("content", "")
 
             if role == "system":
+                flush_tool_results()
                 if content:
                     system_blocks.append({"text": str(content)})
                 continue
 
             if role in {"user", "assistant"}:
+                flush_tool_results()
                 content_blocks: List[Dict[str, Any]] = []
                 if content:
                     content_blocks.append({"text": str(content)})
@@ -339,19 +355,18 @@ class LLMClient:
                 else:
                     result_block = {"text": str(content)}
 
-                converse_messages.append(
+                # Add to pending tool results instead of immediately appending
+                pending_tool_results.append(
                     {
-                        "role": "user",
-                        "content": [
-                            {
-                                "toolResult": {
-                                    "toolUseId": tool_call_id,
-                                    "content": [result_block],
-                                }
-                            }
-                        ],
+                        "toolResult": {
+                            "toolUseId": tool_call_id,
+                            "content": [result_block],
+                        }
                     }
                 )
+
+        # Flush any remaining tool results
+        flush_tool_results()
 
         return system_blocks, converse_messages
 
