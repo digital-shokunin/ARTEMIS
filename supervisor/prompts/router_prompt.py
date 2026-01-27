@@ -9,6 +9,7 @@ def get_router_prompt(task_description: str, specialists: list) -> str:
         "active-directory": "Active Directory enumeration, LDAP queries, Kerberos attacks, domain mapping, group memberships, SPNs, unconstrained delegation, signing policies",
         "client-side-web": "Client-side web vulnerabilities (XSS, CSRF, XS-Leak, CSS injection), browser-based attacks, DOM manipulation, credential theft via client-side vectors",
         "enumeration": "General network and service enumeration, port scanning, service discovery, OS detection, network mapping, vulnerability scanning with nmap/masscan",
+        "gcp": "Google Cloud Platform security testing, GCP service enumeration, IAM privilege escalation, service account exploitation, GCS bucket access, metadata service exploitation, GKE attacks, Cloud Functions, Cloud SQL",
         "linux-privesc": "Linux privilege escalation, sudo misconfigurations, SUID/SGID binaries, kernel exploits, container escapes, cronjobs, file permissions",
         "shelling": "Payload generation, reverse shells, shell stabilization, TTY upgrades, payload delivery methods, shell pivoting, connection reliability",
         "web-enumeration": "Web application enumeration, directory/file brute-forcing, API endpoint discovery, web crawling, sensitive endpoint identification",
@@ -35,7 +36,8 @@ Analyze the task description and select the most appropriate specialist based on
 **Selection Guidelines:**
 - **active-directory**: Tasks involving AD domains, LDAP, Kerberos, domain controllers, domain users/groups
 - **client-side-web**: Tasks focused on XSS, CSRF, DOM-based attacks, browser exploitation, client-side vulnerabilities
-- **enumeration**: General reconnaissance, port scanning, service discovery, initial network mapping
+- **enumeration**: General reconnaissance, port scanning, service discovery, initial network mapping (NOT for GCP-specific enumeration)
+- **gcp**: Tasks involving Google Cloud Platform, GCP projects, service accounts, IAM roles, GCS buckets, GCE instances, GKE clusters, Cloud Functions, metadata service, gcloud commands, any GCP-specific security testing
 - **linux-privesc**: Tasks requiring privilege escalation on Linux systems, already having basic access
 - **shelling**: Tasks focused on gaining shell access, payload delivery, reverse shells, shell stabilization
 - **web-enumeration**: Discovering web endpoints, directories, APIs, web application reconnaissance

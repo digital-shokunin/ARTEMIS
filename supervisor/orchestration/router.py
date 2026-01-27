@@ -31,13 +31,14 @@ class TaskRouter:
         
         # Custom specialist agents
         self.specialists = [
-            "active-directory", 
-            "client-side-web", 
-            "enumeration", 
-            "linux-privesc", 
-            "shelling", 
-            "web-enumeration", 
-            "web", 
+            "active-directory",
+            "client-side-web",
+            "enumeration",
+            "gcp",
+            "linux-privesc",
+            "shelling",
+            "web-enumeration",
+            "web",
             "windows-privesc"
         ]
     
