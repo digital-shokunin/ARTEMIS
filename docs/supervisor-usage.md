@@ -5,17 +5,25 @@ The Supervisor orchestrates multiple Codex instances for comprehensive security 
 ## Prerequisites
 
 ### Environment Variables
-- `OPENROUTER_API_KEY` - **Required** for supervisor LLM access (or use `OPENAI_API_KEY`)
-- `OPENAI_API_KEY` - **Required** for web search functionality via `web_search` tool. Can also be used as primary API key instead of OpenRouter.
+- `OPENROUTER_API_KEY` - **Required** for supervisor LLM access (or use `OPENAI_API_KEY` or configure Bedrock)
 - `SUBAGENT_MODEL` - **Required** for spawned Codex instances
 - `SUPERVISOR_MODEL` - Optional to override default supervisor model
 - `SUMMARIZATION_MODEL` - Optional to override default summarization model
 - `ROUTER_MODEL` - Optional to override default router model
 - `TODO_GENERATOR_OPENROUTER_MODEL` - Optional to override TODO generator model for OpenRouter
 - `TODO_GENERATOR_OPENAI_MODEL` - Optional to override TODO generator model for OpenAI
+- `TODO_GENERATOR_BEDROCK_MODEL` - Optional to override TODO generator model for Bedrock
 - `PROMPT_GENERATOR_MODEL` - Optional to override prompt generator model for custom system prompts
 - `OPENROUTER_AVAILABLE_MODELS` - Optional comma-separated list of OpenRouter models for switching
 - `OPENAI_AVAILABLE_MODELS` - Optional comma-separated list of OpenAI models for switching
+- `BEDROCK_AVAILABLE_MODELS` - Optional comma-separated list of Bedrock models for switching
+
+#### Web Search (Optional)
+The supervisor's `web_search` tool requires a search API key:
+- `BRAVE_SEARCH_API_KEY` - Recommended ([Free tier: 2000 queries/month](https://brave.com/search/api/))
+- `SERPAPI_API_KEY` - Alternative ([Free tier: 100 queries/month](https://serpapi.com/))
+
+If no search API key is configured, the supervisor will provide instructions when attempting to use `web_search`.
 
 ### Codex with OpenRouter
 To use Codex with Openrouter, create a file called `~/.codex/config.toml` with the following:

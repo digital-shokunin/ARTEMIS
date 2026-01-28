@@ -1201,46 +1201,133 @@ class SupervisorTools:
             return f"❌ Error searching supervisor history: {e}"
     
     async def _web_search(self, args: Dict[str, Any]) -> str:
-        """Search the web using OpenAI's built-in web search tool."""
+        """Search the web using Brave Search API or fallback methods."""
         query = args["query"]
+        import os
 
-        instructions = """You are a helpful assistant that can search the web for information. Your job is twofold:
-1. You will be given a query. You must find the top 10 most relevant results from the web, and provide their titles and URLs. These will be used by another model that can `curl` these URLs to get the content.
-2. You should ALSO provide a synthethis of the results, summarizing the most important information from each result.
+        # Try Brave Search API first (has free tier: 2000 queries/month)
+        brave_api_key = os.getenv("BRAVE_SEARCH_API_KEY")
+        if brave_api_key:
+            return await self._brave_search(query, brave_api_key)
 
-Here is the query:
-{query}
+        # Fallback: Try SerpAPI if available
+        serpapi_key = os.getenv("SERPAPI_API_KEY")
+        if serpapi_key:
+            return await self._serpapi_search(query, serpapi_key)
+
+        # No API keys available - return helpful message
+        logging.warning("⚠️ No search API keys configured for web_search tool")
+        return f"""❌ Web search unavailable: No search API key configured.
+
+To enable web search, set one of the following environment variables:
+
+1. **BRAVE_SEARCH_API_KEY** (Recommended - Free tier: 2000 queries/month)
+   Get a free API key at: https://brave.com/search/api/
+
+2. **SERPAPI_API_KEY** (100 free searches/month)
+   Get a free API key at: https://serpapi.com/
+
+Add to your .env file:
+```
+BRAVE_SEARCH_API_KEY=your-api-key-here
+```
+
+**Alternative**: Use codex with the `--search` flag for built-in web search (if using OpenAI API).
+
+**Query attempted**: "{query}"
 """
-        
+
+    async def _brave_search(self, query: str, api_key: str) -> str:
+        """Search using Brave Search API."""
         try:
-            # Import here to avoid circular imports
-            from openai import OpenAI
-            import os
-            
-            # Create OpenAI client for responses API
-            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            
-            logging.info(f"🔍 Performing web search: {query}")
-            
-            # Use OpenAI's responses API with web search
-            response = client.responses.create(
-                model="gpt-5",
-                tools=[{"type": "web_search_preview"}],
-                input=instructions.format(query=query)
-            )
-            
-            # Extract the search results from the response
-            if hasattr(response, 'output_text') and response.output_text:
-                search_results = response.output_text
-                logging.info(f"✅ Web search completed successfully")
-                return f"🔍 Web search results for '{query}':\n\n{search_results}"
+            import requests
+
+            logging.info(f"🔍 Performing Brave Search: {query}")
+
+            url = "https://api.search.brave.com/res/v1/web/search"
+            headers = {
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip",
+                "X-Subscription-Token": api_key
+            }
+            params = {
+                "q": query,
+                "count": 10
+            }
+
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+            results = data.get("web", {}).get("results", [])
+
+            # Format the response
+            output = f"🔍 Web search results for '{query}':\n\n"
+
+            if results:
+                output += "## Top Search Results\n"
+                for i, result in enumerate(results[:10], 1):
+                    title = result.get('title', 'No title')
+                    url = result.get('url', 'No URL')
+                    description = result.get('description', '')
+                    output += f"\n{i}. **{title}**\n"
+                    output += f"   URL: {url}\n"
+                    if description:
+                        output += f"   {description}\n"
             else:
-                logging.warning(f"⚠️ Web search returned empty results")
-                return f"❌ Web search for '{query}' returned no results"
-                
+                output += "No search results found.\n"
+
+            logging.info(f"✅ Brave Search completed with {len(results)} results")
+            return output
+
         except Exception as e:
-            logging.error(f"❌ Web search failed: {e}")
-            return f"❌ Web search failed: {str(e)}"
+            logging.error(f"❌ Brave Search failed: {e}")
+            return f"❌ Brave Search failed: {str(e)}"
+
+    async def _serpapi_search(self, query: str, api_key: str) -> str:
+        """Search using SerpAPI."""
+        try:
+            import requests
+
+            logging.info(f"🔍 Performing SerpAPI Search: {query}")
+
+            url = "https://serpapi.com/search"
+            params = {
+                "q": query,
+                "api_key": api_key,
+                "engine": "google",
+                "num": 10
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+            results = data.get("organic_results", [])
+
+            # Format the response
+            output = f"🔍 Web search results for '{query}':\n\n"
+
+            if results:
+                output += "## Top Search Results\n"
+                for i, result in enumerate(results[:10], 1):
+                    title = result.get('title', 'No title')
+                    url = result.get('link', 'No URL')
+                    snippet = result.get('snippet', '')
+                    output += f"\n{i}. **{title}**\n"
+                    output += f"   URL: {url}\n"
+                    if snippet:
+                        output += f"   {snippet}\n"
+            else:
+                output += "No search results found.\n"
+
+            logging.info(f"✅ SerpAPI Search completed with {len(results)} results")
+            return output
+
+        except Exception as e:
+            logging.error(f"❌ SerpAPI Search failed: {e}")
+            return f"❌ SerpAPI Search failed: {str(e)}"
+
             
     async def _finished(self, args: Dict[str, Any]) -> str:
         """Complete the supervisor session and trigger cleanup."""
