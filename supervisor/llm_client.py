@@ -37,7 +37,7 @@ def get_provider() -> str:
     return "openai"
 
 
-DEFAULT_BEDROCK_MODEL_ID = "anthropic.claude-opus-4-5-20240620-v1:0"
+DEFAULT_BEDROCK_MODEL_ID = "us.anthropic.claude-opus-4-5-20251101-v1:0"
 
 
 class LLMClient:
