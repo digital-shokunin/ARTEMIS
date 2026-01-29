@@ -19,9 +19,10 @@ The Supervisor orchestrates multiple Codex instances for comprehensive security 
 - `BEDROCK_AVAILABLE_MODELS` - Optional comma-separated list of Bedrock models for switching
 
 #### Web Search (Optional)
-The supervisor's `web_search` tool requires a search API key:
+The supervisor's `web_search` tool supports multiple search providers (tries in order):
 - `BRAVE_SEARCH_API_KEY` - Recommended ([Free tier: 2000 queries/month](https://brave.com/search/api/))
 - `SERPAPI_API_KEY` - Alternative ([Free tier: 100 queries/month](https://serpapi.com/))
+- `OPENAI_API_KEY` - Uses OpenAI Responses API with built-in web search (if already configured for other purposes)
 
 If no search API key is configured, the supervisor will provide instructions when attempting to use `web_search`.
 

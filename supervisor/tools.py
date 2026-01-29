@@ -1201,7 +1201,7 @@ class SupervisorTools:
             return f"❌ Error searching supervisor history: {e}"
     
     async def _web_search(self, args: Dict[str, Any]) -> str:
-        """Search the web using Brave Search API or fallback methods."""
+        """Search the web using Brave Search API, SerpAPI, or OpenAI Responses API."""
         query = args["query"]
         import os
 
@@ -1215,6 +1215,11 @@ class SupervisorTools:
         if serpapi_key:
             return await self._serpapi_search(query, serpapi_key)
 
+        # Fallback: Try OpenAI Responses API if available
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if openai_api_key:
+            return await self._openai_search(query, openai_api_key)
+
         # No API keys available - return helpful message
         logging.warning("⚠️ No search API keys configured for web_search tool")
         return f"""❌ Web search unavailable: No search API key configured.
@@ -1226,6 +1231,9 @@ To enable web search, set one of the following environment variables:
 
 2. **SERPAPI_API_KEY** (100 free searches/month)
    Get a free API key at: https://serpapi.com/
+
+3. **OPENAI_API_KEY** (Requires OpenAI API access)
+   Uses OpenAI's Responses API with built-in web search
 
 Add to your .env file:
 ```
@@ -1328,7 +1336,46 @@ BRAVE_SEARCH_API_KEY=your-api-key-here
             logging.error(f"❌ SerpAPI Search failed: {e}")
             return f"❌ SerpAPI Search failed: {str(e)}"
 
-            
+    async def _openai_search(self, query: str, api_key: str) -> str:
+        """Search the web using OpenAI's built-in web search tool."""
+        instructions = """You are a helpful assistant that can search the web for information. Your job is twofold:
+1. You will be given a query. You must find the top 10 most relevant results from the web, and provide their titles and URLs. These will be used by another model that can `curl` these URLs to get the content.
+2. You should ALSO provide a synthethis of the results, summarizing the most important information from each result.
+
+Here is the query:
+{query}
+"""
+
+        try:
+            # Import here to avoid circular imports
+            from openai import OpenAI
+
+            # Create OpenAI client for responses API
+            client = OpenAI(api_key=api_key)
+
+            logging.info(f"🔍 Performing web search: {query}")
+
+            # Use OpenAI's responses API with web search
+            response = client.responses.create(
+                model="gpt-5",
+                tools=[{"type": "web_search_preview"}],
+                input=instructions.format(query=query)
+            )
+
+            # Extract the search results from the response
+            if hasattr(response, 'output_text') and response.output_text:
+                search_results = response.output_text
+                logging.info(f"✅ Web search completed successfully")
+                return f"🔍 Web search results for '{query}':\n\n{search_results}"
+            else:
+                logging.warning(f"⚠️ Web search returned empty results")
+                return f"❌ Web search for '{query}' returned no results"
+
+        except Exception as e:
+            logging.error(f"❌ Web search failed: {e}")
+            return f"❌ Web search failed: {str(e)}"
+
+
     async def _finished(self, args: Dict[str, Any]) -> str:
         """Complete the supervisor session and trigger cleanup."""
         finish_reason = args["finish_reason"]
