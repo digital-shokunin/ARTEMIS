@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import signal
 from datetime import datetime, timezone
 from pathlib import Path
@@ -190,18 +191,26 @@ class InstanceManager:
         instance = self.instances[instance_id]
         process = instance["process"]
         duration_minutes = instance["duration_minutes"]
-        
+
         try:
             timeout_seconds = duration_minutes * 60
             await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
-            
+
             if process.returncode == 0:
-                instance["status"] = "completed"
-                logging.info(f"✅ Instance {instance_id} completed successfully")
+                # Check for hidden errors even if exit code is 0
+                error_details = await self._check_instance_errors(instance_id, instance["log_dir"])
+
+                if error_details:
+                    instance["status"] = "failed"
+                    logging.error(f"❌ Instance {instance_id} reported success but contains errors:")
+                    logging.error(f"❌ {error_details}")
+                else:
+                    instance["status"] = "completed"
+                    logging.info(f"✅ Instance {instance_id} completed successfully")
             elif process.returncode == -9:
                 instance["status"] = "terminated"
                 logging.info(f"🛑 Instance {instance_id} was terminated (SIGKILL)")
-                
+
                 try:
                     stdout, stderr = await process.communicate()
                     if stderr:
@@ -212,7 +221,7 @@ class InstanceManager:
             else:
                 instance["status"] = "failed"
                 logging.error(f"❌ Instance {instance_id} failed with exit code {process.returncode}")
-                
+
                 try:
                     stdout, stderr = await process.communicate()
                     if stderr:
@@ -227,6 +236,62 @@ class InstanceManager:
         
         except Exception as e:
             logging.error(f"Error monitoring instance {instance_id}: {e}")
+
+    async def _check_instance_errors(self, instance_id: str, log_dir: Path) -> str:
+        """Check instance output files for errors even if exit code is 0."""
+        try:
+            # Check realtime_context.txt for error patterns
+            context_file = log_dir / "realtime_context.txt"
+            if context_file.exists():
+                with open(context_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+
+                    # Look for common error patterns
+                    error_patterns = [
+                        (r'401 Unauthorized', "401 Unauthorized - Authentication failed"),
+                        (r'403 Forbidden', "403 Forbidden - Permission denied"),
+                        (r'exceeded retry limit', "Exceeded retry limit"),
+                        (r'ERROR:.*?(401|403|500|502|503)', "HTTP error in output"),
+                        (r'Authentication failed', "Authentication failed"),
+                        (r'Invalid API key', "Invalid API key"),
+                        (r'Model not found', "Model not found"),
+                    ]
+
+                    for pattern, description in error_patterns:
+                        if re.search(pattern, content, re.IGNORECASE):
+                            # Extract the specific error line for logging
+                            error_lines = []
+                            for line in content.split('\n'):
+                                if re.search(pattern, line, re.IGNORECASE):
+                                    error_lines.append(line.strip())
+
+                            if error_lines:
+                                # Return first few error lines
+                                return f"{description}: {' | '.join(error_lines[:3])}"
+                            return description
+
+            # Check final_result.json for error indicators
+            result_file = log_dir / "final_result.json"
+            if result_file.exists():
+                try:
+                    with open(result_file, 'r', encoding='utf-8') as f:
+                        result_data = json.load(f)
+
+                        # Check for error messages in conversation
+                        if "conversation" in result_data:
+                            for msg in result_data["conversation"]:
+                                if isinstance(msg, dict) and "content" in msg:
+                                    content = str(msg["content"])
+                                    if "401" in content or "unauthorized" in content.lower():
+                                        return "401 Unauthorized error found in conversation"
+                except json.JSONDecodeError:
+                    pass
+
+            return None
+
+        except Exception as e:
+            logging.debug(f"Error checking instance {instance_id} for errors: {e}")
+            return None
             instance["status"] = "error"
     
     async def send_followup(self, instance_id: str, message: str) -> bool:
