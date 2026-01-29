@@ -1,4 +1,4 @@
-# Bedrock Support Workaround Guide
+# Bedrock Support Implementation Guide
 
 ## What Was Fixed
 
@@ -17,13 +17,65 @@
 ❌ 401 Unauthorized - Authentication failed: exceeded retry limit, last status: 401 Unauthorized
 ```
 
-### 2. 🚧 Bedrock Support (Requires More Work)
+### 2. ✅ Native Bedrock Support (IMPLEMENTED!)
 
-**Problem**: Codex Rust CLI has no AWS Bedrock support.
+**Problem**: Codex Rust CLI had no AWS Bedrock support, causing 401 errors.
 
-**Immediate Workaround**: Use OpenRouter as a bridge (see below)
+**Solution**: Full native Bedrock Converse API implementation in Codex Rust CLI!
 
-**Proper Solution**: Implement Bedrock in Rust CLI (2-4 hours, see implementation plan below)
+**Status**: COMPLETE - Native Bedrock support is now available!
+
+---
+
+## Using Native Bedrock Support (Recommended)
+
+Native Bedrock support is now implemented in the Codex Rust CLI. This is the **recommended** approach.
+
+### Quick Setup (2 minutes)
+
+1. **Set environment variables** in `/home/digish0/ARTEMIS/.env`:
+   ```bash
+   # Bedrock bearer token (required for both supervisor and codex)
+   AWS_BEARER_TOKEN_BEDROCK=your-bearer-token-here
+
+   # Region (optional, defaults to us-west-2)
+   BEDROCK_REGION=us-west-2
+
+   # For supervisor (Python)
+   LLM_PROVIDER=bedrock
+   BEDROCK_MODEL_ID=us.anthropic.claude-opus-4-5-20251101-v1:0
+
+   # For codex instances (Rust) - IMPORTANT!
+   SUBAGENT_MODEL=us.anthropic.claude-opus-4-5-20251101-v1:0
+   ```
+
+2. **Optional: Configure in `~/.codex/config.toml`** (if you want Bedrock as default):
+   ```toml
+   model_provider = "bedrock"
+   model = "us.anthropic.claude-opus-4-5-20251101-v1:0"
+   ```
+
+3. **Test it**:
+   ```bash
+   cd /home/digish0/ARTEMIS
+   . .venv/bin/activate
+   source .env
+
+   # Test codex directly with Bedrock
+   codex-rs/target/release/codex exec --model us.anthropic.claude-opus-4-5-20251101-v1:0 "Echo hello"
+   ```
+
+4. **Run supervisor** - codex instances will now use Bedrock natively!
+
+### What's Included
+
+- ✅ Full Bedrock Converse API implementation
+- ✅ Bearer token authentication
+- ✅ Message conversion (user/assistant/system roles)
+- ✅ Token usage reporting
+- ✅ Proper error handling with clear messages
+- ✅ No external dependencies or proxy services needed
+- ✅ Works with all Bedrock-supported Claude models
 
 ---
 
