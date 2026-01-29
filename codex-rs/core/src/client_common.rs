@@ -24,6 +24,7 @@ const BASE_INSTRUCTIONS: &str = include_str!("../prompt.md");
 const ACTIVE_DIRECTORY_INSTRUCTIONS: &str = include_str!("../active_directory.md");
 const CLIENT_SIDE_WEB_INSTRUCTIONS: &str = include_str!("../client_side_web.md");
 const ENUMERATION_INSTRUCTIONS: &str = include_str!("../enumeration.md");
+const GCP_INSTRUCTIONS: &str = include_str!("../gcp.md");
 const LINUX_PRIVESC_INSTRUCTIONS: &str = include_str!("../linux_privesc.md");
 const SHELLING_INSTRUCTIONS: &str = include_str!("../shelling.md");
 const WEB_ENUMERATION_INSTRUCTIONS: &str = include_str!("../web_enumeration.md");
@@ -62,6 +63,7 @@ impl Prompt {
             Some("active_directory") => ACTIVE_DIRECTORY_INSTRUCTIONS,
             Some("client_side_web") => CLIENT_SIDE_WEB_INSTRUCTIONS,
             Some("enumeration") => ENUMERATION_INSTRUCTIONS,
+            Some("gcp") => GCP_INSTRUCTIONS,
             Some("linux_privesc") => LINUX_PRIVESC_INSTRUCTIONS,
             Some("shelling") => SHELLING_INSTRUCTIONS,
             Some("web_enumeration") => WEB_ENUMERATION_INSTRUCTIONS,
