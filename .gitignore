@@ -89,3 +89,6 @@ CHANGELOG.ignore.md
 __pycache__/
 *.pyo
 *.pyd
+
+
+configs/trellix/

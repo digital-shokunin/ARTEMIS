@@ -7,6 +7,7 @@
 
 mod apply_patch;
 mod bash;
+pub mod bedrock_api;
 mod chat_completions;
 pub mod client;
 pub mod client_common;

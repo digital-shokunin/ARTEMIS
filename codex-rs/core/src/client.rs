@@ -106,6 +106,7 @@ impl ModelClient {
     pub async fn stream(&self, prompt: &Prompt) -> Result<ResponseStream> {
         match self.provider.wire_api {
             WireApi::Responses => self.stream_responses(prompt).await,
+            WireApi::Bedrock => self.stream_bedrock(prompt).await,
             WireApi::Chat => {
                 // Create the raw streaming connection first.
                 let response_stream = stream_chat_completions(
@@ -363,6 +364,140 @@ impl ModelClient {
                 }
             }
         }
+    }
+
+    /// Implementation for AWS Bedrock Converse API.
+    async fn stream_bedrock(&self, prompt: &Prompt) -> Result<ResponseStream> {
+        use crate::bedrock_api::*;
+        use crate::client_common::ResponseStream as Stream;
+        use codex_protocol::models::{ResponseItem, ContentItem};
+
+        // Get bearer token from environment
+        let bearer_token = std::env::var("AWS_BEARER_TOKEN_BEDROCK")
+            .map_err(|_| CodexErr::Stream("AWS_BEARER_TOKEN_BEDROCK environment variable not set. Set it in your .env file or export it before running.".to_string(), None))?;
+
+        // Get region from environment (default to us-west-2)
+        let region = std::env::var("BEDROCK_REGION")
+            .unwrap_or_else(|_| "us-west-2".to_string());
+
+        // Construct Bedrock endpoint
+        let model_id = &self.config.model_family.slug;
+        let url = format!(
+            "https://bedrock-runtime.{}.amazonaws.com/model/{}/converse",
+            region, model_id
+        );
+
+        // Convert prompt input to Bedrock format
+        let mut bedrock_messages = Vec::new();
+        let mut system_blocks = Vec::new();
+
+        for item in &prompt.input {
+            if let ResponseItem::Message { role, content, .. } = item {
+                // Extract text from content items
+                let mut text_parts = Vec::new();
+                for content_item in content {
+                    match content_item {
+                        ContentItem::InputText { text } | ContentItem::OutputText { text } => {
+                            text_parts.push(text.clone());
+                        }
+                        _ => {}
+                    }
+                }
+                let text = text_parts.join("\n");
+
+                match role.as_str() {
+                    "system" => {
+                        system_blocks.push(SystemContentBlock { text });
+                    }
+                    "user" | "assistant" => {
+                        bedrock_messages.push(BedrockMessage::new(role.clone(), text));
+                    }
+                    _ => {
+                        debug!("Skipping message with unknown role: {}", role);
+                    }
+                }
+            }
+        }
+
+        // Build request body
+        let mut request = BedrockConverseRequest::new(bedrock_messages);
+
+        if !system_blocks.is_empty() {
+            request = request.with_system(system_blocks);
+        }
+
+        // Add inference config with reasonable defaults
+        let inference_config = InferenceConfig {
+            max_tokens: Some(8192),
+            temperature: Some(0.7),
+            top_p: None,
+            stop_sequences: None,
+        };
+        request = request.with_inference_config(inference_config);
+
+        // Make HTTP request
+        let response = self.client
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {}", bearer_token))
+            .json(&request)
+            .send()
+            .await?;
+
+        // Check status
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(CodexErr::UnexpectedStatus(
+                status,
+                format!("Bedrock API error: {}", body)
+            ));
+        }
+
+        // Parse response
+        let bedrock_response: BedrockConverseResponse = response.json().await?;
+
+        // Convert response to ResponseStream
+        let (tx, rx) = mpsc::channel(32);
+
+        // Extract content from response
+        let output_message = bedrock_response.output.message;
+        let mut text_content = String::new();
+
+        for block in &output_message.content {
+            if let ContentBlock::Text { text } = block {
+                text_content.push_str(text);
+            }
+        }
+
+        // Convert token counts to u64
+        let input_tokens = bedrock_response.usage.input_tokens as u64;
+        let output_tokens = bedrock_response.usage.output_tokens as u64;
+        let total_tokens = input_tokens + output_tokens;
+
+        // Send events in a spawn task
+        tokio::spawn(async move {
+            // Send text output
+            if !text_content.is_empty() {
+                let _ = tx.send(Ok(ResponseEvent::OutputTextDelta(text_content))).await;
+            }
+
+            // Send completion event
+            let _ = tx.send(Ok(ResponseEvent::Completed {
+                response_id: "bedrock-response".to_string(),
+                token_usage: Some(TokenUsage {
+                    input_tokens,
+                    cached_input_tokens: None,
+                    output_tokens,
+                    reasoning_output_tokens: None,
+                    total_tokens,
+                }),
+            })).await;
+        });
+
+        // Return ResponseStream wrapping the receiver
+        Ok(Stream { rx_event: rx })
     }
 
     pub fn get_provider(&self) -> ModelProviderInfo {

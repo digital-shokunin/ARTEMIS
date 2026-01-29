@@ -37,6 +37,9 @@ pub enum WireApi {
     /// Regular Chat Completions compatible with `/v1/chat/completions`.
     #[default]
     Chat,
+
+    /// AWS Bedrock Converse API.
+    Bedrock,
 }
 
 /// Serializable representation of a provider definition.
@@ -156,6 +159,11 @@ impl ModelProviderInfo {
         match self.wire_api {
             WireApi::Responses => format!("{base_url}/responses{query_string}"),
             WireApi::Chat => format!("{base_url}/chat/completions{query_string}"),
+            WireApi::Bedrock => {
+                // Bedrock URL is constructed dynamically in stream_bedrock() based on region
+                // This method shouldn't be called for Bedrock, but we return a placeholder
+                base_url
+            }
         }
     }
 
@@ -279,6 +287,27 @@ pub fn built_in_model_providers() -> HashMap<String, ModelProviderInfo> {
                 stream_max_retries: None,
                 stream_idle_timeout_ms: None,
                 requires_openai_auth: true,
+            },
+        ),
+        (
+            "bedrock",
+            P {
+                name: "AWS Bedrock".into(),
+                // Bedrock endpoint is constructed dynamically based on region
+                base_url: None,
+                env_key: Some("AWS_BEARER_TOKEN_BEDROCK".into()),
+                env_key_instructions: Some(
+                    "Set AWS_BEARER_TOKEN_BEDROCK environment variable with your bearer token.\n\
+                     Also set BEDROCK_REGION (e.g., us-west-2) to specify the AWS region.".into()
+                ),
+                wire_api: WireApi::Bedrock,
+                query_params: None,
+                http_headers: None,
+                env_http_headers: None,
+                request_max_retries: Some(3),
+                stream_max_retries: Some(5),
+                stream_idle_timeout_ms: Some(300_000),
+                requires_openai_auth: false,
             },
         ),
         (BUILT_IN_OSS_MODEL_PROVIDER_ID, create_oss_provider()),
